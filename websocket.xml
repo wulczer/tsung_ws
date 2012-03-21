@@ -36,6 +36,16 @@
 
         <thinktime value="1"/>
 
+        <for from="1" to="10" incr="1" var="i">
+          <request>
+            <websocket type="ping">ping</websocket>
+          </request>
+
+          <thinktime value="1"/>
+        </for>
+
+        <thinktime value="1"/>
+
         <request>
           <websocket type="close">{"message": "bye"}</websocket>
         </request>

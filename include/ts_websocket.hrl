@@ -10,6 +10,7 @@
 	  }).
 
 -record(websocket, {
-	  state, % initial | connected
-	  accept % binary()
+	  state, % initial | connected | ping
+	  accept, % binary()
+	  ping % binary()
 	 }).

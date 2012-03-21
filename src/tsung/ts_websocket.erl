@@ -26,7 +26,7 @@
 
 
 session_defaults() ->
-    {ok, true}.
+    {ok, true, true}.
 
 
 decode_buffer(Buffer,#websocket{}) ->
@@ -80,7 +80,9 @@ get_message(#websocket_request{type=connect, url=Url}, State=#state_rcv{session=
 get_message(#websocket_request{type=close, data=Data}, #state_rcv{session=Session}) ->
     {make_frame(?OPCODE_CLOSE, Data), Session};
 get_message(#websocket_request{type=send, data=Data}, #state_rcv{session=Session}) ->
-    {make_frame(?OPCODE_TEXT, Data), Session}.
+    {make_frame(?OPCODE_TEXT, Data), Session};
+get_message(#websocket_request{type=ping, data=Data}, #state_rcv{session=Session}) ->
+    {make_frame(?OPCODE_PING, Data), Session#websocket{state=ping, ping=Data}}.
 
 
 extract_header(Name, [Header | Tail]) ->
@@ -171,13 +173,40 @@ parse(Data, State=#state_rcv{acc=[], session=Session})
 	more ->
 	    {State#state_rcv{ack_done = true, acc = Data}, [], false}
     end;
+parse(Data, State=#state_rcv{acc=[], session=Session})
+  when Session#websocket.state == ping ->
+    Expected = Session#websocket.ping,
+    case parse_frame(Data) of
+	{?OPCODE_PONG, Expected, << >>} ->
+	    {State#state_rcv{ack_done = true, session = Session#websocket{state = connected}}, [], false};
+	{?OPCODE_PONG, Wrong, << >>} ->
+	    %% log, but don't disconnect
+	    ts_mon:add({count, error_websocket_ping}),
+	    ?LOGF("WEBSOCKET: Wrong ping respnse: [~p] ~n", [Wrong], ?NOTICE),
+	    {State#state_rcv{ack_done = true, session = Session#websocket{state = connected}}, [], false};
+	{_Opcode, _Payload, Tail} ->
+	    %% discard frame, don't acknowledge while waiting for the ping response
+	    {State#state_rcv{ack_done = false, acc = Tail}, [], false};
+	more ->
+	    {State#state_rcv{ack_done = true, acc = Data}, [], false}
+    end;
 parse(Data, State=#state_rcv{acc=Acc, datasize=DataSize}) ->
     NewSize= DataSize + size(Data),
     parse(<< Acc/binary, Data/binary >>, State#state_rcv{acc = [], datasize = NewSize}).
 
 
-parse_bidi(Data, State) ->
-    ts_plugin:parse_bidi(Data,State).
+parse_bidi(Data, State=#state_rcv{acc=[]}) ->
+    case parse_frame(Data) of
+	{?OPCODE_CLOSE, _Payload, << >>} ->
+	    ?LOG("WEBSOCKET: Got close frame ~n", ?DEB),
+	    {make_frame(?OPCODE_CLOSE, << >>), State};
+	{?OPCODE_PING, Payload, Tail} ->
+	    {make_frame(?OPCODE_PONG, Payload), State#state_rcv{acc = Tail}};
+	{_Opcode, _Payload, Tail} ->
+	    {nodata, State#state_rcv{acc = Tail}}
+    end;
+parse_bidi(Data, State=#state_rcv{acc=Acc}) ->
+    parse_bidi(<< Acc/binary, Data/binary >>, State#state_rcv{acc = []}).
 
 
 init_dynparams() ->
