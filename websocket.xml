@@ -28,6 +28,12 @@
           <websocket type="connect" url="/websocket" />
         </request>
 
+        <thinktime value="1" />
+
+        <request>
+          <websocket type="close">Bye!</websocket>
+        </request>
+
     </session>
   </sessions>
 </tsung>

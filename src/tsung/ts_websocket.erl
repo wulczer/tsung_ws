@@ -37,6 +37,35 @@ new_session() ->
     #websocket{state = initial}.
 
 
+mask(Payload, MaskingKey) ->
+    Div = size(Payload) div size(MaskingKey),
+    Rem = size(Payload) rem size(MaskingKey),
+    LongPart = binary:copy(MaskingKey, Div),
+    Rest = binary:part(MaskingKey, {0, Rem}),
+    Mask = << LongPart/bitstring, Rest/bitstring >>,
+    crypto:exor(Payload, Mask).
+
+
+make_frame(Opcode, Payload) ->
+    MaskingKey = crypto:rand_bytes(4),
+    PayloadLength = size(Payload),
+    Length = if PayloadLength < 127 ->
+		     << PayloadLength:7 >>;
+		PayloadLength < 65536 ->
+		     << 126:7, PayloadLength:16 >>;
+		true ->
+		     << 127:7, 0:1, PayloadLength:63 >>
+	     end,
+    Masked = mask(Payload, MaskingKey),
+    << 1:1, % FIN
+       0:3, % RSV
+       Opcode:4, % OPCODE
+       1:1, % MASK
+       Length/bitstring,
+       MaskingKey/binary,
+       Masked/bitstring >>.
+
+
 get_message(#websocket_request{type=connect, url=Url}, State=#state_rcv{session=Session}) ->
     Nonce = base64:encode(crypto:rand_bytes(16)),
     Accept = base64:encode(crypto:sha(<< Nonce/binary, ?ACCEPT_GUID/binary >>)),
@@ -47,7 +76,9 @@ get_message(#websocket_request{type=connect, url=Url}, State=#state_rcv{session=
 					    "Sec-WebSocket-Key: " ++ binary_to_list(Nonce),
 					    "Sec-WebSocket-Version: 13",
 					    "", ""], "\r\n")),
-    {Handshake, Session#websocket{accept = Accept}}.
+    {Handshake, Session#websocket{accept = Accept}};
+get_message(#websocket_request{type=close, data=Data}, #state_rcv{session=Session}) ->
+    {make_frame(?OPCODE_CLOSE, Data), Session}.
 
 
 extract_header(Name, [Header | Tail]) ->
@@ -76,6 +107,39 @@ extract_accept(Data) ->
     end.
 
 
+parse_payload(Opcode, << 0:1, % MASK
+			 Length:7,
+			 Payload:Length/binary,
+			 Rest/bitstring >>)
+  when Length < 126 ->
+    {Opcode, Payload, Rest};
+parse_payload(Opcode, << 0:1, % MASK
+			 126:7,
+			 Length:16,
+			 Payload:Length/binary,
+			 Rest/bitstring >>)
+  when Length < 65536 ->
+    {Opcode, Payload, Rest};
+parse_payload(Opcode, << 0:1, % MASK
+			 127:7,
+			 0:1,
+			 Length:63,
+			 Payload:Length/binary,
+			 Rest/bitstring >>) ->
+    {Opcode, Payload, Rest};
+parse_payload(_Opcode, _Data) ->
+    more.
+
+
+parse_frame(<< 1:1, % FIN
+	       0:3, % RSV
+	       Opcode:4, % OPCODE
+	       MaskLengthAndPayload/bitstring >>) ->
+    parse_payload(Opcode, MaskLengthAndPayload);
+parse_frame(_Data) ->
+    more.
+
+
 parse(closed, State) ->
     {State#state_rcv{ack_done = true, datasize = 0}, [], true};
 parse(Data, State=#state_rcv{acc=[], datasize=0}) ->
@@ -85,12 +149,25 @@ parse(Data, State=#state_rcv{acc=[], session=Session})
     Expected = Session#websocket.accept,
     case extract_accept(Data) of
 	Expected ->
-	    {State#state_rcv{ack_done = true}, [], false};
+	    ?LOG("WEBSOCKET: Correct accept header ~n", ?DEB),
+	    {State#state_rcv{ack_done = true, session = Session#websocket{state = connected}}, [], false};
 	more ->
 	    {State#state_rcv{ack_done = false, acc = Data}, [], false};
 	Wrong ->
 	    ts_mon:add({count, error_websocket}),
+	    ?LOGF("WEBSOCKET: Wrong accept header: [~p] ~n", [Wrong], ?NOTICE),
 	    {State#state_rcv{ack_done = true}, [], true}
+    end;
+parse(Data, State=#state_rcv{acc=[], session=Session})
+  when Session#websocket.state == connected ->
+    case parse_frame(Data) of
+	{?OPCODE_CLOSE, _Payload, << >>} ->
+	    ?LOG("WEBSOCKET: Got close frame ~n", ?DEB),
+	    {State#state_rcv{ack_done = true}, [], true};
+	{Opcode, _Payload, Tail} ->
+	    {State#state_rcv{ack_done = true, acc = Tail}, [], false};
+	more ->
+	    {State#state_rcv{ack_done = true, acc = Data}, [], false}
     end;
 parse(Data, State=#state_rcv{acc=Acc, datasize=DataSize}) ->
     NewSize= DataSize + size(Data),

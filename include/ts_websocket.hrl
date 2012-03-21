@@ -1,6 +1,7 @@
 -record(websocket_request, {
 	  type, % connect | send | ping | close
-	  url % string() (only used in connect requests)
+	  url, % string() (only used in connect requests)
+	  data % binary()
 	 }).
 
 
