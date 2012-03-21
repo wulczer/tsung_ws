@@ -78,7 +78,9 @@ get_message(#websocket_request{type=connect, url=Url}, State=#state_rcv{session=
 					    "", ""], "\r\n")),
     {Handshake, Session#websocket{accept = Accept}};
 get_message(#websocket_request{type=close, data=Data}, #state_rcv{session=Session}) ->
-    {make_frame(?OPCODE_CLOSE, Data), Session}.
+    {make_frame(?OPCODE_CLOSE, Data), Session};
+get_message(#websocket_request{type=send, data=Data}, #state_rcv{session=Session}) ->
+    {make_frame(?OPCODE_TEXT, Data), Session}.
 
 
 extract_header(Name, [Header | Tail]) ->

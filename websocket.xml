@@ -25,13 +25,19 @@
     <session probability="100" name="ws" type="ts_websocket">
 
         <request>
-          <websocket type="connect" url="/websocket" />
+          <websocket type="connect" url="/websocket"/>
         </request>
 
-        <thinktime value="1" />
+        <thinktime value="1"/>
 
         <request>
-          <websocket type="close">Bye!</websocket>
+          <websocket type="send">{"message": "login", "api_key": "s3cr3t"}</websocket>
+        </request>
+
+        <thinktime value="1"/>
+
+        <request>
+          <websocket type="close">{"message": "bye"}</websocket>
         </request>
 
     </session>

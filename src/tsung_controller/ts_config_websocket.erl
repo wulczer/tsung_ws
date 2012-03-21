@@ -17,10 +17,17 @@ parse_config(Element = #xmlElement{name=websocket},
                             subst= SubstFlag, sessions = [CurS |_]}) ->
 
     Type = ts_config:getAttr(atom, Element#xmlElement.attributes, type),
+    % send messages can be no_ack, the rest is always ack = parse
+    Ack = case Type of
+	      send ->
+		  ts_config:getAttr(atom, Element#xmlElement.attributes, ack, parse);
+	      _ ->
+		  parse
+	  end,
     Url = ts_config:getAttr(string, Element#xmlElement.attributes, url, "/"),
     Data = list_to_binary(ts_config:getText(Element#xmlElement.content)),
     Request = #websocket_request{type = Type, url = Url, data = Data},
-    Msg = #ts_request{ack = parse,
+    Msg = #ts_request{ack = Ack,
 		      endpage = true,
 		      dynvar_specs = DynVar,
 		      subst = SubstFlag,
