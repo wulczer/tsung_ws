@@ -164,7 +164,7 @@ parse(Data, State=#state_rcv{acc=[], session=Session})
 	{?OPCODE_CLOSE, _Payload, << >>} ->
 	    ?LOG("WEBSOCKET: Got close frame ~n", ?DEB),
 	    {State#state_rcv{ack_done = true}, [], true};
-	{Opcode, _Payload, Tail} ->
+	{_Opcode, _Payload, Tail} ->
 	    {State#state_rcv{ack_done = true, acc = Tail}, [], false};
 	more ->
 	    {State#state_rcv{ack_done = true, acc = Data}, [], false}
