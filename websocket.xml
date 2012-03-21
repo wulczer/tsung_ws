@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!DOCTYPE tsung SYSTEM "tsung-1.0.dtd">
+<tsung loglevel="debug">
+
+  <clients>
+    <client host="localhost" use_controller_vm="true"/>
+  </clients>
+
+  <!-- Server side setup -->
+  <servers>
+    <server host="127.0.0.1" port="8081" type="ssl"/>
+  </servers>
+
+  <monitoring>
+    <monitor host="localhost"/>
+  </monitoring>
+
+  <load>
+    <arrivalphase phase="1" duration="1" unit="second">
+      <users interarrival="1" unit="second"></users>
+    </arrivalphase>
+  </load>
+
+  <sessions>
+    <session probability="100" name="ws" type="ts_websocket">
+
+        <request>
+          <websocket type="connect" url="/websocket" />
+        </request>
+
+    </session>
+  </sessions>
+</tsung>
