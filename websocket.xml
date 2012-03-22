@@ -1,14 +1,13 @@
 <?xml version="1.0"?>
 <!DOCTYPE tsung SYSTEM "tsung-1.0.dtd">
-<tsung loglevel="debug">
+<tsung loglevel="notice">
 
   <clients>
     <client host="localhost" use_controller_vm="true"/>
   </clients>
 
-  <!-- Server side setup -->
   <servers>
-    <server host="127.0.0.1" port="8081" type="ssl"/>
+    <server host="127.0.0.1" port="8080" type="tcp"/>
   </servers>
 
   <monitoring>
@@ -16,7 +15,7 @@
   </monitoring>
 
   <load>
-    <arrivalphase phase="1" duration="1" unit="second">
+    <arrivalphase phase="1" duration="5" unit="minute">
       <users interarrival="1" unit="second"></users>
     </arrivalphase>
   </load>
@@ -25,7 +24,7 @@
     <session probability="100" name="ws" type="ts_websocket">
 
         <request>
-          <websocket type="connect" url="/websocket"/>
+          <websocket type="connect" url="/"/>
         </request>
 
         <thinktime value="1"/>
@@ -36,12 +35,17 @@
 
         <thinktime value="1"/>
 
+        <request>
+          <!-- don't wait for a response from the server, hence ack="no_ack" -->
+          <websocket type="send" ack="no_ack">{"message": "data", "value": 3}</websocket>
+        </request>
+
         <for from="1" to="10" incr="1" var="i">
+          <thinktime value="1"/>
+
           <request>
             <websocket type="ping">ping</websocket>
           </request>
-
-          <thinktime value="1"/>
         </for>
 
         <thinktime value="1"/>

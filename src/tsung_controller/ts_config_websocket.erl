@@ -9,13 +9,14 @@
 -include("xmerl.hrl").
 
 
+% parse dynamic variables
 parse_config(Element = #xmlElement{name=dyn_variable}, Conf = #config{}) ->
     ts_config:parse(Element,Conf);
+% parse websocket tags
 parse_config(Element = #xmlElement{name=websocket},
              Config=#config{curid= Id, session_tab = Tab,
-                            match=MatchRegExp, dynvar=DynVar,
-                            subst= SubstFlag, sessions = [CurS |_]}) ->
-
+                            match = MatchRegExp, dynvar = DynVar,
+                            subst = SubstFlag, sessions = [CurS | _]}) ->
     Type = ts_config:getAttr(atom, Element#xmlElement.attributes, type),
     % send messages can be no_ack, the rest is always ack = parse
     Ack = case Type of
@@ -36,10 +37,12 @@ parse_config(Element = #xmlElement{name=websocket},
 
     ts_config:mark_prev_req(Id-1, Tab, CurS),
     ets:insert(Tab,{{CurS#session.id, Id}, Msg }),
-    lists:foldl( fun(A,B)->ts_config:parse(A,B) end,
-                 Config#config{dynvar=[]},
-                 Element#xmlElement.content);
-parse_config(Element = #xmlElement{}, Conf = #config{}) ->
+    lists:foldl(fun(A,B) -> ts_config:parse(A,B) end,
+		Config#config{dynvar = []},
+		Element#xmlElement.content);
+% parse other tags
+parse_config(Element=#xmlElement{}, Conf=#config{}) ->
     ts_config:parse(Element,Conf);
-parse_config(_, Conf = #config{}) ->
+% parse non-XML elements
+parse_config(_, Conf=#config{}) ->
     Conf.
