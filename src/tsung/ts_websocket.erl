@@ -29,8 +29,9 @@ session_defaults() ->
     {ok, true, true}.
 
 
-decode_buffer(Buffer,#websocket{}) ->
-    Buffer.
+decode_buffer(Buffer, #websocket{}) ->
+    {_Opcode, Payload, _Rest} = parse_frame(Buffer),
+    Payload.
 
 
 new_session() ->
