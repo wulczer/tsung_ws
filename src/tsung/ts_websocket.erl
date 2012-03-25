@@ -108,10 +108,10 @@ get_message(#websocket_request{type=send, data=Data}, #state_rcv{session=Session
     {make_frame(?OPCODE_TEXT, Data), Session};
 % Send a ping frame and wait for a pong response with the same payload.
 get_message(#websocket_request{type=ping, data=Data}, #state_rcv{session=Session}) ->
-    {make_frame(?OPCODE_PING, Data), Session#websocket{state=ping, ping=Data}}.
+    {make_frame(?OPCODE_PING, Data), Session#websocket{state=ping, ping=Data}};
 % Send the closing frame.
 get_message(#websocket_request{type=close, data=Data}, #state_rcv{session=Session}) ->
-    {make_frame(?OPCODE_CLOSE, Data), Session};
+    {make_frame(?OPCODE_CLOSE, Data), Session}.
 
 
 % extract_header(binary, [binary]) -> binary
