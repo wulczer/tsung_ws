@@ -23,9 +23,10 @@ Why not just build on tsung_websockets? The reasons are:
 Usage
 =====
 
-Get the source for Tsung. On Debian/Ubuntu use::
+Get the source and build dependencies for Tsung. On Debian/Ubuntu use::
 
   apt-get source tsung
+  sudo apt-get build-dep tsung
 
 Copy the DTD and provided Erlang files from tsung_ws to the Tsung source tree::
 
@@ -40,4 +41,13 @@ Compile Tsung::
   ./configure --prefix=$HOME/local/tsung
   make install
 
-Edit the example websocket.xml configuration file and test your WebSockets server!
+Start the example Python WebSockets server (you will need Twisted and a fork of
+txWebSocket) and run Tsung using the provided configuration file::
+
+  sudo apt-get install python-twisted
+  sudo pip install -e git://github.com/wulczer/txWebSocket.git#egg=txWebSocket
+  $HOME/local/tsung/bin/tsung -f websocket.xml start
+
+After the run is done, you can generate an HTML report::
+
+  $HOME/local/tsung/lib/tsung/bin/tsung_stats.pl
