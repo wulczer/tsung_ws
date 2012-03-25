@@ -298,8 +298,19 @@ init_dynparams() ->
     #dyndata{proto = #websocket_dyndata{}}.
 
 
-add_dynparams(_Subst, _DynData, Param, _HostData) ->
-    Param#websocket_request{}.
+add_dynparams(false, DynData, Param, HostData) ->
+    add_dynparams(DynData#dyndata.proto, Param, HostData);
+add_dynparams(true, DynData, Param, HostData) ->
+    NewParam = subst(Param, DynData#dyndata.dynvars),
+    add_dynparams(DynData#dyndata.proto,NewParam, HostData).
+
+
+add_dynparams(#websocket_dyndata{}, Param, _HostData) ->
+    Param.
+
+
+subst(Req=#websocket_request{url=Url, data=Data}, DynVars) ->
+    Req#websocket_request{url=ts_search:subst(Url, DynVars), data=ts_search:subst(Data, DynVars)}.
 
 
 parse_config(Element, Config) ->
