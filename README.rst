@@ -23,10 +23,16 @@ Why not just build on tsung_websockets? The reasons are:
 Usage
 =====
 
-Get the source and build dependencies for Tsung. On Debian/Ubuntu use::
+Get the source and build dependencies for Tsung. On Debian use::
 
   apt-get source tsung
   sudo apt-get build-dep tsung
+
+For Ubuntu or other distros you'll have to download the source from upstream::
+
+  sudo apt-get install erlang-nox python-matplotlib gnuplot libtemplate-perl openssh-client openssh-server
+  wget http://tsung.erlang-projects.org/dist/tsung-1.4.2.tar.gz
+  tar xzf tsung-1.4.2.tar.gz
 
 Copy the DTD and provided Erlang files from tsung_ws to the Tsung source tree::
 
@@ -41,13 +47,23 @@ Compile Tsung::
   ./configure --prefix=$HOME/local/tsung
   make install
 
+Tsung uses SSH to launch monitoring and controller processes, make sure your
+user can connect to localhost without needing a password (this assumes you have
+generated an SSH key before)::
+
+  cat $HOME/.ssh/id_rsa.pub >> $HOME/.ssh/authorized_keys
+
 Start the example Python WebSockets server (you will need Twisted and a fork of
 txWebSocket) and run Tsung using the provided configuration file::
 
   sudo apt-get install python-twisted
   sudo pip install -e git://github.com/wulczer/txWebSocket.git#egg=txWebSocket
-  $HOME/local/tsung/bin/tsung -f websocket.xml start
+  cd ../tsung_ws/
+  python math_server.py
+  $HOME/local/tsung/bin/tsung -f websocket.xml -m /tmp/tsung.log start
 
 After the run is done, you can generate an HTML report::
 
-  $HOME/local/tsung/lib/tsung/bin/tsung_stats.pl
+  mkdir report
+  cd report
+  $HOME/local/tsung/lib/tsung/bin/tsung_stats.pl --stats /tmp/tsung.log
