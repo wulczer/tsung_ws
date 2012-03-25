@@ -2,58 +2,191 @@
 <!DOCTYPE tsung SYSTEM "tsung-1.0.dtd">
 <tsung loglevel="notice">
 
+  <!-- generate the load on localhost -->
   <clients>
-    <client host="localhost" use_controller_vm="true"/>
+    <client host="localhost" use_controller_vm="true" maxusers="800"/>
   </clients>
 
+  <!-- the target server is running on the same machine and uses SSL -->
   <servers>
-    <server host="127.0.0.1" port="8080" type="tcp"/>
+    <server host="127.0.0.1" port="8080" type="ssl"/>
   </servers>
 
+  <!-- gather OS statistics from the host -->
   <monitoring>
     <monitor host="localhost"/>
   </monitoring>
 
   <load>
-    <arrivalphase phase="1" duration="5" unit="minute">
-      <users interarrival="1" unit="second"></users>
+    <!-- first, a steady stream of new users -->
+    <arrivalphase phase="1" duration="3" unit="minute">
+      <users arrivalrate="1" unit="second"></users>
+    </arrivalphase>
+
+    <!-- then it gets interesting -->
+    <arrivalphase phase="2" duration="3" unit="minute">
+      <users arrivalrate="5" unit="second"></users>
+    </arrivalphase>
+
+    <!-- and ends up in an avalanche -->
+    <arrivalphase phase="3" duration="3" unit="minute">
+      <users arrivalrate="10" unit="second"></users>
     </arrivalphase>
   </load>
 
+  <!--
+      here we define three types of sessions, where the user:
+      * does a simple 2+3 calculation
+      * does two calculations in parallel
+      * computes a very large number and stays connected for a long time after that
+  -->
   <sessions>
-    <session probability="100" name="ws" type="ts_websocket">
+
+    <!-- connect and calculate 2 + 3 -->
+    <session probability="60" name="simple_sum" type="ts_websocket">
+
+      <request>
+        <websocket type="connect" url="/ws"/>
+      </request>
+
+      <request>
+        <!-- capture the returned UUID -->
+        <dyn_variable name="uuid" jsonpath="uuid"/>
+        <websocket type="send">{"msg": "uuid"}</websocket>
+      </request>
+
+      <!-- the push requests are no_ack, because we don't expect anything in return (not how we include the previously captured UUID) -->
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 2, "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 3, "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": "+", "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <!-- calculate the result and check if it's correct -->
+      <request subst="true">
+        <match do="log" when="nomatch">{"result": 5.0}</match>
+        <websocket type="send">{"msg": "compute", "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <!-- stay connected, pinging the server every now and then -->
+      <for var="i" from="1" to="10" incr="1">
+
+        <thinktime value="10"/>
 
         <request>
-          <websocket type="connect" url="/"/>
+          <websocket type="ping">PING</websocket>
         </request>
 
-        <thinktime value="1"/>
+      </for>
 
-        <request>
-          <websocket type="send">{"message": "login", "api_key": "s3cr3t"}</websocket>
-        </request>
-
-        <thinktime value="1"/>
-
-        <request>
-          <!-- don't wait for a response from the server, hence ack="no_ack" -->
-          <websocket type="send" ack="no_ack">{"message": "data", "value": 3}</websocket>
-        </request>
-
-        <for from="1" to="10" incr="1" var="i">
-          <thinktime value="1"/>
-
-          <request>
-            <websocket type="ping">ping</websocket>
-          </request>
-        </for>
-
-        <thinktime value="1"/>
-
-        <request>
-          <websocket type="close">{"message": "bye"}</websocket>
-        </request>
+      <request>
+        <websocket type="close"/>
+      </request>
 
     </session>
+
+    <!-- run two calculations in parallel -->
+    <session probability="20" name="interleave_sessions" type="ts_websocket">
+
+      <request>
+        <websocket type="connect" url="/ws"/>
+      </request>
+
+      <!-- proceed to request two UUIDs, prepare two stacks and compute them both -->
+
+      <request>
+        <dyn_variable name="uuid1" jsonpath="uuid"/>
+        <websocket type="send">{"msg": "uuid"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 5, "uuid": "%%_uuid1%%"}</websocket>
+      </request>
+
+      <request>
+        <dyn_variable name="uuid2" jsonpath="uuid"/>
+        <websocket type="send">{"msg": "uuid"}</websocket>
+      </request>
+
+      <thinktime value="1"/>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 8, "uuid": "%%_uuid2%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 2, "uuid": "%%_uuid1%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 2, "uuid": "%%_uuid2%%"}</websocket>
+      </request>
+
+      <thinktime value="1"/>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": "*", "uuid": "%%_uuid1%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": "*", "uuid": "%%_uuid2%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <match do="log" when="nomatch">{"result": 10.0}</match>
+        <websocket type="send">{"msg": "compute", "uuid": "%%_uuid1%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <match do="log" when="nomatch">{"result": 16.0}</match>
+        <websocket type="send">{"msg": "compute", "uuid": "%%_uuid2%%"}</websocket>
+      </request>
+
+      <request>
+        <websocket type="close"/>
+      </request>
+
+    </session>
+
+    <!-- calculate a large number -->
+    <session probability="20" name="large_number" type="ts_websocket">
+
+      <request>
+        <websocket type="connect" url="/ws"/>
+      </request>
+
+      <request>
+        <dyn_variable name="uuid" jsonpath="uuid"/>
+        <websocket type="send">{"msg": "uuid"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 32, "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": 32, "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send" ack="no_ack">{"msg": "push", "token": "**", "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <request subst="true">
+        <websocket type="send">{"msg": "compute", "uuid": "%%_uuid%%"}</websocket>
+      </request>
+
+      <request>
+        <websocket type="close"/>
+      </request>
+
+    </session>
+
   </sessions>
 </tsung>
