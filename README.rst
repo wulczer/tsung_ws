@@ -67,3 +67,8 @@ After the run is done, you can generate an HTML report::
   mkdir report
   cd report
   $HOME/local/tsung/lib/tsung/bin/tsung_stats.pl --stats /tmp/tsung.log
+
+Loose ends
+==========
+
+More error checking, handling continuation and binary frames, better logging.
