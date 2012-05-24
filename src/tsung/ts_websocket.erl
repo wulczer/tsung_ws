@@ -114,24 +114,38 @@ get_message(#websocket_request{type=close, data=Data}, #state_rcv{session=Sessio
     {make_frame(?OPCODE_CLOSE, Data), Session}.
 
 
+% icase_equal(binary, binary) -> boolean
+%
+% compare two binary strings ignoring their case
+icase_equal(A, B) ->
+    string:equal(string:to_lower(binary_to_list(A)),
+		 string:to_lower(binary_to_list(B))).
+
+
 % extract_header(binary, [binary]) -> binary
 %
 % Given a header name (binary) and a list of header lines, get the
 % value for that header or an empty bitstring if the header is not
 % present.
-extract_header(Name, [Header | Tail]) ->
+extract_header(Target, [Header | Tail]) ->
     % get the header name and value
     case binary:split(Header, << ": " >>) of
 	[Name, Val] ->
-	    % found it
-	    Val;
+	    case icase_equal(Target, Name) of
+		true ->
+		    % found the target header
+		    Val;
+		_ ->
+		    % not the header we're looking for
+		    extract_header(Target, Tail)
+	    end;
 	_ ->
-	    % not the header we're looking for
-	    extract_header(Name, Tail)
+	    % the line did not include a ": ", ignore it
+	    extract_header(Target, Tail)
     end;
-extract_header(Name, []) ->
+extract_header(Target, []) ->
     % the header was not found
-    ?LOGF("WEBSOCKET: Header ~p not found ~n", [Name], ?NOTICE),
+    ?LOGF("WEBSOCKET: Header ~p not found ~n", [Target], ?NOTICE),
     << >>.
 
 
