@@ -46,7 +46,7 @@
     <session probability="60" name="simple_sum" type="ts_websocket">
 
       <request>
-        <websocket type="connect" url="/ws"/>
+        <websocket type="connect" origin="https://127.0.0.1/" url="/ws"/>
       </request>
 
       <request>

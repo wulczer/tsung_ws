@@ -90,19 +90,24 @@ make_frame(Opcode, Payload) ->
 % Generate a request to the server.
 %
 % Open a connection.
-get_message(#websocket_request{type=connect, url=Url}, State=#state_rcv{session=Session}) ->
+get_message(#websocket_request{type=connect, url=Url, origin=Origin}, State=#state_rcv{session=Session}) ->
     % generate the initial HTTP request and wait for a response with
     % the correct Sec-WebSocket-Accept header
     Nonce = base64:encode(crypto:rand_bytes(16)),
     Accept = base64:encode(crypto:sha(<< Nonce/binary, ?ACCEPT_GUID/binary >>)),
-    Handshake = list_to_binary(string:join(["GET " ++ Url ++ " HTTP/1.1",
-					    "Host: " ++ State#state_rcv.host,
-					    "Upgrade: websocket",
-					    "Connection: Upgrade",
-					    "Sec-WebSocket-Key: " ++ binary_to_list(Nonce),
-					    "Sec-WebSocket-Version: 13",
-					    "", ""], "\r\n")),
-    {Handshake, Session#websocket{accept = Accept}};
+    Handshake = lists:append([["GET " ++ Url ++ " HTTP/1.1",
+			       "Host: " ++ State#state_rcv.host,
+			       "Upgrade: websocket",
+			       "Connection: Upgrade"],
+			      case Origin of
+				  undefined ->
+				      [];
+				  _ ->
+				      ["Origin: " ++ Origin]
+			      end,
+			      ["Sec-WebSocket-Key: " ++ binary_to_list(Nonce),
+			       "Sec-WebSocket-Version: 13", "", ""]]),
+	{list_to_binary(string:join(Handshake, "\r\n")), Session#websocket{accept = Accept}};
 % Send some data using a text frame.
 get_message(#websocket_request{type=send, data=Data}, #state_rcv{session=Session}) ->
     {make_frame(?OPCODE_TEXT, Data), Session};

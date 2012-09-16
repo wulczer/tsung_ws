@@ -26,8 +26,12 @@ parse_config(Element = #xmlElement{name=websocket},
 		  parse
 	  end,
     Url = ts_config:getAttr(string, Element#xmlElement.attributes, url, "/"),
+    % connect message can have a origin attribute
+    Origin = ts_config:getAttr(string, Element#xmlElement.attributes,
+			       origin, undefined),
     Data = list_to_binary(ts_config:getText(Element#xmlElement.content)),
-    Request = #websocket_request{type = Type, url = Url, data = Data},
+    Request = #websocket_request{type = Type, url = Url,
+				 origin = Origin, data = Data},
     Msg = #ts_request{ack = Ack,
 		      endpage = true,
 		      dynvar_specs = DynVar,

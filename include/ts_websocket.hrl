@@ -9,11 +9,16 @@
 % url (string)
 %   the URL to issue the initial GET request to, only used if type is connect, defaults to "/"
 %
+% origin (string | undefined)
+%   optional contents of the Origin for the initial GET request, only
+%   used if type is connect, not sent if undefined
+%
 % data (binary)
 %   the payload to be sent, ignored in connect requests
 -record(websocket_request, {
 	  type,
 	  url,
+	  origin,
 	  data
 	 }).
 

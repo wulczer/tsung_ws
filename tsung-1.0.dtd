@@ -268,6 +268,7 @@ repeat | if | change_type | foreach | set_option)*>
 <!ATTLIST websocket
     type   (connect | send | ping | close) #REQUIRED
     url    CDATA "/"
+    origin CDATA #IMPLIED
     ack    (no_ack | parse) #IMPLIED
 >
 
